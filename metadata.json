@@ -1,0 +1,5 @@
+{
+  "name": "AI Route Planner Pro",
+  "description": "An intelligent route planning application that uses AI to extract addresses from images, calculate optimal routes, and display travel distances and durations.",
+  "requestFramePermissions": []
+}
