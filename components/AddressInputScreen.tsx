@@ -54,8 +54,8 @@ const AddressInputScreen: React.FC<AddressInputScreenProps> = ({
   return (
     <>
       <Banner />
-      <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-lg animate-fade-in">
-        <h2 className="text-2xl font-bold mb-1 text-content-100">Plan Your Route</h2>
+      <div className="bg-white/80 backdrop-blur-md border border-slate-200/50 p-6 sm:p-8 rounded-2xl shadow-lg animate-fade-in">
+        <h2 className="text-2xl font-bold font-heading mb-1 text-content-100">Plan Your Route</h2>
         <p className="text-content-200 mb-6">Add stops manually or by uploading an image.</p>
         
         <div className="flex flex-col sm:flex-row gap-3 mb-4">
@@ -151,7 +151,7 @@ const AddressInputScreen: React.FC<AddressInputScreenProps> = ({
           <div className="mt-8 flex justify-end">
             <button
               onClick={proceedToReview}
-              className="w-full sm:w-auto bg-brand-primary hover:bg-brand-primary-dark text-brand-text font-bold py-3 px-8 rounded-lg flex items-center justify-center transition-transform hover:scale-105 disabled:opacity-50 disabled:scale-100"
+              className="w-full sm:w-auto bg-gradient-primary text-brand-text font-bold py-3 px-8 rounded-lg flex items-center justify-center transition-transform hover:scale-105 disabled:opacity-50 disabled:scale-100"
               disabled={isLoading}
             >
               Review Route

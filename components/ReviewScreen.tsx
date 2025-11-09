@@ -45,8 +45,8 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({
   };
 
   return (
-    <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-lg animate-fade-in">
-      <h2 className="text-2xl font-bold mb-1 text-content-100">Review Your Stops</h2>
+    <div className="bg-white/80 backdrop-blur-md border border-slate-200/50 p-6 sm:p-8 rounded-2xl shadow-lg animate-fade-in">
+      <h2 className="text-2xl font-bold font-heading mb-1 text-content-100">Review Your Stops</h2>
       <p className="text-content-200 mb-6">Your route will start at the first stop and end at the last. Drag to reorder waypoints.</p>
       
       <ul className="space-y-3">
@@ -91,7 +91,7 @@ const ReviewScreen: React.FC<ReviewScreenProps> = ({
         </button>
         <button
           onClick={calculateRoute}
-          className="w-full sm:w-auto bg-brand-primary hover:bg-brand-primary-dark text-brand-text font-bold py-3 px-8 rounded-lg flex items-center justify-center transition-transform hover:scale-105 disabled:opacity-50 disabled:scale-100"
+          className="w-full sm:w-auto bg-gradient-primary text-brand-text font-bold py-3 px-8 rounded-lg flex items-center justify-center transition-transform hover:scale-105 disabled:opacity-50 disabled:scale-100"
           disabled={isLoading}
         >
           {isLoading ? (

@@ -26,25 +26,26 @@ const Banner: React.FC = () => {
 
   return (
     <div 
-      className="bg-brand-text rounded-2xl p-8 mb-8 overflow-hidden relative animate-fade-in"
+      className="bg-gradient-dark rounded-2xl p-8 mb-8 overflow-hidden relative animate-fade-in"
     >
-      {/* Animated background shapes */}
+      {/* Decorative background elements */}
+      <LogoIcon className="absolute -right-16 -bottom-16 w-64 h-64 text-brand-primary/5 opacity-50 rotate-12" />
       <div className="absolute -top-10 -right-10 w-48 h-48 bg-brand-primary/10 rounded-full animate-pulse-slow"></div>
       <div 
-        className="absolute -bottom-16 -left-16 w-64 h-64 bg-brand-primary/5 rounded-full animate-pulse-slow"
+        className="absolute -bottom-16 -left-16 w-64 h-64 bg-brand-secondary/10 rounded-full animate-pulse-slow"
         style={{ animationDelay: '1s' }}
       ></div>
       
       <div className="relative z-10 flex flex-col md:flex-row items-center gap-8">
         <div className="flex-shrink-0">
           <LogoIcon 
-            className="w-24 h-24 text-brand-primary opacity-0 animate-fade-in" 
+            className="w-28 h-28 text-brand-primary opacity-0 animate-fade-in animate-glow" 
             style={{ animationDelay: '0.2s' }}
           />
         </div>
         <div>
           <h2 
-            className="text-3xl font-bold text-white mb-2 opacity-0 animate-slide-in-up"
+            className="text-3xl font-bold font-heading text-white mb-2 opacity-0 animate-slide-in-up"
             style={{ animationDelay: '0.4s' }}
           >
             Welcome to the AI Route Planner

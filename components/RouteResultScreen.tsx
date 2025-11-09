@@ -30,7 +30,7 @@ const DirectionsList: React.FC<{ directions: string[] }> = ({ directions }) => (
     </div>
 );
 
-type BadgeColor = 'green' | 'blue' | 'yellow' | 'red';
+type BadgeColor = 'green' | 'blue' | 'yellow' | 'red' | 'purple';
 
 const ComparisonBadge: React.FC<{ text: string; color: BadgeColor }> = ({ text, color }) => {
   const colorClasses: Record<BadgeColor, string> = {
@@ -38,6 +38,7 @@ const ComparisonBadge: React.FC<{ text: string; color: BadgeColor }> = ({ text, 
     blue: 'bg-blue-100 text-blue-800',
     yellow: 'bg-yellow-100 text-yellow-800',
     red: 'bg-red-100 text-red-800',
+    purple: 'bg-purple-100 text-purple-800',
   };
   return (
     <span className={`${colorClasses[color]} text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap`}>
@@ -122,7 +123,28 @@ const RouteResultScreen: React.FC<RouteResultScreenProps> = ({
       zoom: 12,
       disableDefaultUI: true,
       zoomControl: true,
-      mapId: 'ROUTE_PLANNER_MAP'
+      mapId: 'ROUTE_PLANNER_MAP',
+      styles: [ // Custom map styles for a modern look
+        { elementType: "geometry", stylers: [{ color: "#f5f5f5" }] },
+        { elementType: "labels.icon", stylers: [{ visibility: "off" }] },
+        { elementType: "labels.text.fill", stylers: [{ color: "#616161" }] },
+        { elementType: "labels.text.stroke", stylers: [{ color: "#f5f5f5" }] },
+        { featureType: "administrative.land_parcel", stylers: [{ visibility: "off" }] },
+        { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#0891b2" }] },
+        { featureType: "poi", elementType: "geometry", stylers: [{ color: "#eeeeee" }] },
+        { featureType: "poi", elementType: "labels.text.fill", stylers: [{ color: "#757575" }] },
+        { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#e5e5e5" }] },
+        { featureType: "poi.park", elementType: "labels.text.fill", stylers: [{ color: "#9e9e9e" }] },
+        { featureType: "road", elementType: "geometry", stylers: [{ color: "#ffffff" }] },
+        { featureType: "road.arterial", elementType: "labels.text.fill", stylers: [{ color: "#757575" }] },
+        { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#dadada" }] },
+        { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#616161" }] },
+        { featureType: "road.local", elementType: "labels.text.fill", stylers: [{ color: "#9e9e9e" }] },
+        { featureType: "transit.line", elementType: "geometry", stylers: [{ color: "#e5e5e5" }] },
+        { featureType: "transit.station", elementType: "geometry", stylers: [{ color: "#eeeeee" }] },
+        { featureType: "water", elementType: "geometry", stylers: [{ color: "#c9c9c9" }] },
+        { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#9e9e9e" }] },
+      ]
     });
 
     const bounds = new window.google.maps.LatLngBounds();
@@ -131,9 +153,9 @@ const RouteResultScreen: React.FC<RouteResultScreenProps> = ({
       
       const pinGlyph = new window.google.maps.marker.PinElement({
         glyph: (index + 1).toString(),
-        glyphColor: "#111827",
-        background: "#a3e635",
-        borderColor: "#111827",
+        glyphColor: "#ffffff",
+        background: index === 0 ? "#0891b2" : index === displayedStops.length - 1 ? "#be123c" : "#111827",
+        borderColor: "#ffffff",
       });
 
       new window.google.maps.marker.AdvancedMarkerElement({
@@ -156,7 +178,7 @@ const RouteResultScreen: React.FC<RouteResultScreenProps> = ({
       geodesic: true,
       strokeColor: "#111827",
       strokeOpacity: 0.8,
-      strokeWeight: 4,
+      strokeWeight: 5,
     });
 
     routePath.setMap(map);
@@ -167,14 +189,14 @@ const RouteResultScreen: React.FC<RouteResultScreenProps> = ({
     <div className="animate-fade-in">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <div>
-            <h2 className="text-2xl font-bold text-content-100">Your Optimized Route</h2>
+            <h2 className="text-3xl font-bold font-heading text-content-100">Your Optimized Route</h2>
             <p className="text-content-200">The most efficient path has been calculated for you.</p>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
              <button
                 onClick={handleSaveRoute}
                 disabled={isLoading || saveButtonText === 'Route Saved!'}
-                className="bg-brand-primary hover:bg-brand-primary-dark text-brand-text font-bold py-2 px-4 rounded-lg flex items-center transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-brand-secondary hover:bg-brand-secondary-dark text-white font-bold py-2 px-4 rounded-lg flex items-center transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
                 <SaveIcon className="w-5 h-5 mr-2" />
                 {saveButtonText}
@@ -185,7 +207,7 @@ const RouteResultScreen: React.FC<RouteResultScreenProps> = ({
               className="bg-white hover:bg-medium text-content-100 border border-medium font-bold py-2 px-4 rounded-lg flex items-center transition disabled:opacity-50"
             >
               <StartOverIcon className="w-5 h-5 mr-2" />
-              Start New Route
+              Start New
             </button>
         </div>
       </div>
@@ -201,7 +223,10 @@ const RouteResultScreen: React.FC<RouteResultScreenProps> = ({
                             badges.push(<ComparisonBadge key="fastest" text="Fastest" color="green" />);
                         }
                         if (option.totalDistance === comparisonStats.minDistance) {
-                            badges.push(<ComparisonBadge key="shortest" text="Shortest" color="blue" />);
+                            badges.push(<ComparisonBadge key="shortest" text="blue" />);
+                        }
+                        if (option.label.toLowerCase().includes("scenic")) {
+                           badges.push(<ComparisonBadge key="scenic" text="Scenic" color="purple" />);
                         }
                         if (routeOptions.length > 2) {
                             if (option.totalDuration === comparisonStats.maxDuration) {
@@ -220,7 +245,7 @@ const RouteResultScreen: React.FC<RouteResultScreenProps> = ({
                             disabled={isLoading}
                             className={`p-4 rounded-lg border-2 text-left transition-all duration-200 w-full flex flex-col justify-between disabled:opacity-50 ${
                                 selectedRouteIndex === index
-                                    ? 'bg-brand-primary/20 border-brand-primary shadow-lg scale-105'
+                                    ? 'bg-brand-primary/10 border-brand-primary shadow-lg scale-105'
                                     : 'bg-white hover:bg-light hover:border-dark border-medium'
                             }`}
                         >
@@ -254,7 +279,7 @@ const RouteResultScreen: React.FC<RouteResultScreenProps> = ({
       <div className="flex flex-col lg:flex-row gap-8">
         {/* Route Details */}
         <div className="w-full lg:w-3/5 xl:w-2/3">
-            <div className="bg-white rounded-2xl shadow-lg">
+            <div className="bg-white/80 backdrop-blur-md border border-slate-200/50 rounded-2xl shadow-lg overflow-hidden">
                 {/* Map */}
                 <div className="w-full h-72 md:h-96 rounded-t-2xl overflow-hidden bg-medium">
                     <div ref={mapRef} className="w-full h-full" aria-label="Route map"/>
@@ -265,18 +290,18 @@ const RouteResultScreen: React.FC<RouteResultScreenProps> = ({
                     <div key={stop.id} className="relative pl-12 pb-8">
                         {/* Vertical line */}
                         {index < displayedStops.length - 1 &&
-                            <div className="absolute left-6 top-5 h-full w-0.5 bg-medium"></div>
+                            <div className="absolute left-[22px] top-5 h-full w-1 bg-brand-primary/50 rounded"></div>
                         }
 
                         {/* Circle */}
                         <div className="absolute left-0 top-0 w-12 h-12 flex items-center justify-center">
-                            <div className="w-8 h-8 rounded-full bg-brand-text text-white flex items-center justify-center font-bold z-10">
+                            <div className="w-9 h-9 rounded-full bg-brand-text text-white flex items-center justify-center font-bold z-10 shadow-md">
                                 {index + 1}
                             </div>
                         </div>
 
                         <div className="pl-4">
-                            <h3 className="font-bold text-lg text-content-100 flex items-start pt-1">
+                            <h3 className="font-bold text-lg text-content-100 flex items-start pt-1.5">
                                 <span>{stop.address}</span>
                             </h3>
                             {index > 0 && stop.distance !== undefined && stop.duration !== undefined && (
@@ -307,7 +332,7 @@ const RouteResultScreen: React.FC<RouteResultScreenProps> = ({
                     </div>
                     ))}
                     {isLoading && (
-                    <div className="absolute inset-0 bg-white/80 flex items-center justify-center rounded-b-2xl">
+                    <div className="absolute inset-0 bg-white/90 flex items-center justify-center rounded-b-2xl">
                         <Spinner />
                         <span className="ml-3 text-lg font-semibold">Recalculating...</span>
                     </div>
@@ -318,43 +343,46 @@ const RouteResultScreen: React.FC<RouteResultScreenProps> = ({
 
         {/* Totals Summary */}
         <div className="w-full lg:w-2/5 xl:w-1/3">
-          <div className="bg-white p-6 rounded-2xl shadow-lg sticky top-6">
-            <h3 className="text-xl font-bold mb-5 flex items-center text-content-100"><TotalIcon className="w-6 h-6 mr-3 text-brand-primary"/>Route Summary</h3>
-            <div className="space-y-5">
-              <div>
-                <p className="text-sm font-medium text-content-200">Total Stops</p>
-                <p className="text-3xl font-bold text-brand-text">{displayedStops.length}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-content-200">Total Distance</p>
-                <p className="text-3xl font-bold text-brand-text">{formatDistance(totalDistance)}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-content-200">Est. Total Duration</p>
-                <p className="text-3xl font-bold text-brand-text">{formatDuration(totalDuration)}</p>
-              </div>
-            </div>
+          <div className="bg-white/80 backdrop-blur-md border border-slate-200/50 rounded-2xl shadow-lg sticky top-28 overflow-hidden">
+            <div className="border-t-4 border-brand-primary"></div>
+            <div className="p-6">
+                <h3 className="text-xl font-bold font-heading mb-5 flex items-center text-content-100"><TotalIcon className="w-6 h-6 mr-3 text-brand-primary"/>Route Summary</h3>
+                <div className="space-y-5">
+                <div>
+                    <p className="text-sm font-medium text-content-200">Total Stops</p>
+                    <p className="text-3xl font-bold text-brand-text">{displayedStops.length}</p>
+                </div>
+                <div>
+                    <p className="text-sm font-medium text-content-200">Total Distance</p>
+                    <p className="text-3xl font-bold text-brand-text">{formatDistance(totalDistance)}</p>
+                </div>
+                <div>
+                    <p className="text-sm font-medium text-content-200">Est. Total Duration</p>
+                    <p className="text-3xl font-bold text-brand-text">{formatDuration(totalDuration)}</p>
+                </div>
+                </div>
 
-            <div className="border-t border-medium mt-6 pt-6">
-                <h4 className="font-semibold mb-3 text-content-100">Add Another Stop</h4>
-                <div className="flex gap-2">
-                    <input
-                        type="text"
-                        value={newStopAddress}
-                        onChange={(e) => setNewStopAddress(e.target.value)}
-                        onKeyPress={handleKeyPress}
-                        placeholder="Enter address"
-                        className="flex-grow w-full bg-light border border-medium text-content-100 rounded-lg px-3 py-2 text-base focus:ring-2 focus:ring-brand-primary focus:border-brand-primary focus:outline-none transition"
-                        disabled={isLoading}
-                    />
-                    <button
-                        onClick={handleAddStop}
-                        className="flex-shrink-0 bg-brand-primary hover:bg-brand-primary-dark text-brand-text font-bold p-2.5 rounded-lg flex items-center justify-center transition disabled:bg-gray-400 disabled:cursor-not-allowed"
-                        disabled={!newStopAddress.trim() || isLoading}
-                        title="Add stop and recalculate"
-                    >
-                        <AddIcon className="w-5 h-5" />
-                    </button>
+                <div className="border-t border-medium mt-6 pt-6">
+                    <h4 className="font-semibold mb-3 text-content-100">Add Another Stop</h4>
+                    <div className="flex gap-2">
+                        <input
+                            type="text"
+                            value={newStopAddress}
+                            onChange={(e) => setNewStopAddress(e.target.value)}
+                            onKeyPress={handleKeyPress}
+                            placeholder="Enter address"
+                            className="flex-grow w-full bg-light border border-medium text-content-100 rounded-lg px-3 py-2 text-base focus:ring-2 focus:ring-brand-primary focus:border-brand-primary focus:outline-none transition"
+                            disabled={isLoading}
+                        />
+                        <button
+                            onClick={handleAddStop}
+                            className="flex-shrink-0 bg-brand-primary hover:bg-brand-primary-dark text-brand-text font-bold p-2.5 rounded-lg flex items-center justify-center transition disabled:bg-gray-400 disabled:cursor-not-allowed"
+                            disabled={!newStopAddress.trim() || isLoading}
+                            title="Add stop and recalculate"
+                        >
+                            <AddIcon className="w-5 h-5" />
+                        </button>
+                    </div>
                 </div>
             </div>
           </div>

@@ -12,7 +12,7 @@ const ai = new GoogleGenAI({ apiKey: API_KEY });
 
 export async function extractAddressesFromImage(base64Image: string, mimeType: string): Promise<string[]> {
   const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash-image",
+    model: "gemini-2.5-flash",
     contents: {
       parts: [
         {

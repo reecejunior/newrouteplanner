@@ -16,8 +16,15 @@ export default function App() {
   const [currentView, setCurrentView] = useState<AppView>(AppView.INPUT);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isMapsKeyInvalid, setIsMapsKeyInvalid] = useState(false);
   const [savedRouteExists, setSavedRouteExists] = useState(false);
+  const [showSplashScreen, setShowSplashScreen] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowSplashScreen(false);
+    }, 2500); // Show splash for 2.5 seconds
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     // Check for saved route in local storage
@@ -29,16 +36,6 @@ export default function App() {
     } catch (e) {
       console.error("Could not read from local storage", e);
       setSavedRouteExists(false);
-    }
-
-    // Check if the placeholder API key is still present in the script tag.
-    const scripts = document.getElementsByTagName('script');
-    for (let i = 0; i < scripts.length; i++) {
-        const src = scripts[i].src;
-        if (src.includes('maps.googleapis.com/maps/api/js') && src.includes('YOUR_API_KEY_HERE')) {
-            setIsMapsKeyInvalid(true);
-            break;
-        }
     }
   }, []);
 
@@ -214,62 +211,64 @@ export default function App() {
 
 
   return (
-    <div className="min-h-screen bg-light flex flex-col items-center p-4 sm:p-6 lg:p-8">
-      <header className="w-full max-w-5xl mx-auto flex items-center justify-start mb-8">
-        <LogoIcon className="w-10 h-10 text-brand-text" />
-        <h1 className="text-2xl font-bold ml-3 text-brand-text tracking-tight">
-          Route Planner
-        </h1>
-      </header>
-      <main className="w-full max-w-5xl mx-auto">
-        {isMapsKeyInvalid && (
-          <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-6 rounded-lg" role="alert">
-            <p className="font-bold">Configuration Required</p>
-            <p>The Google Maps API key is missing. Please replace <code className="font-mono bg-yellow-200 p-1 rounded">YOUR_API_KEY_HERE</code> in the <code className="font-mono bg-yellow-200 p-1 rounded">index.html</code> file with a valid key to enable map functionality.</p>
+    <>
+      <div className={`fixed inset-0 z-50 flex items-center justify-center bg-brand-text transition-opacity duration-700 ease-out ${showSplashScreen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+        <LogoIcon className="w-48 h-48 text-brand-primary animate-glow" />
+      </div>
+
+      <div className="app-background min-h-screen flex flex-col items-center">
+        <header className="sticky top-0 z-40 w-full backdrop-blur-sm">
+          <div className="max-w-5xl mx-auto flex items-center justify-start p-4 sm:p-6">
+              <LogoIcon className="w-10 h-10 text-brand-primary-dark" />
+              <h1 className="text-3xl font-heading font-bold ml-3 text-light tracking-tight">
+                AI Route Planner
+              </h1>
           </div>
-        )}
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-6" role="alert">
-            <strong className="font-bold">Error: </strong>
-            <span className="block sm:inline">{error}</span>
-          </div>
-        )}
-        {currentView === AppView.INPUT && (
-          <AddressInputScreen
-            stops={stops}
-            addStop={addStop}
-            removeStop={removeStop}
-            handleImageUpload={handleImageUpload}
-            proceedToReview={proceedToReview}
-            isLoading={isLoading}
-            clearStops={clearStops}
-            loadRoute={loadRoute}
-            savedRouteExists={savedRouteExists}
-          />
-        )}
-        {currentView === AppView.REVIEW && (
-          <ReviewScreen
-            stops={stops}
-            removeStop={removeStop}
-            reorderStops={reorderStops}
-            calculateRoute={() => calculateRoute()}
-            goBack={() => setCurrentView(AppView.INPUT)}
-            isLoading={isLoading}
-          />
-        )}
-        {currentView === AppView.RESULT && (
-          <RouteResultScreen
-            routeOptions={routeOptions}
-            selectedRouteIndex={selectedRouteIndex}
-            selectRoute={selectRoute}
-            displayedStops={getStopsForDisplay(routeOptions[selectedRouteIndex], stops)}
-            startOver={startOver}
-            addStopToRoute={addStopToRoute}
-            isLoading={isLoading}
-            saveRoute={saveRoute}
-          />
-        )}
-      </main>
-    </div>
+        </header>
+        <main className="w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {error && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-6" role="alert">
+              <strong className="font-bold">Error: </strong>
+              <span className="block sm:inline">{error}</span>
+            </div>
+          )}
+          {currentView === AppView.INPUT && (
+            <AddressInputScreen
+              stops={stops}
+              addStop={addStop}
+              removeStop={removeStop}
+              handleImageUpload={handleImageUpload}
+              proceedToReview={proceedToReview}
+              isLoading={isLoading}
+              clearStops={clearStops}
+              loadRoute={loadRoute}
+              savedRouteExists={savedRouteExists}
+            />
+          )}
+          {currentView === AppView.REVIEW && (
+            <ReviewScreen
+              stops={stops}
+              removeStop={removeStop}
+              reorderStops={reorderStops}
+              calculateRoute={() => calculateRoute()}
+              goBack={() => setCurrentView(AppView.INPUT)}
+              isLoading={isLoading}
+            />
+          )}
+          {currentView === AppView.RESULT && (
+            <RouteResultScreen
+              routeOptions={routeOptions}
+              selectedRouteIndex={selectedRouteIndex}
+              selectRoute={selectRoute}
+              displayedStops={getStopsForDisplay(routeOptions[selectedRouteIndex], stops)}
+              startOver={startOver}
+              addStopToRoute={addStopToRoute}
+              isLoading={isLoading}
+              saveRoute={saveRoute}
+            />
+          )}
+        </main>
+      </div>
+    </>
   );
 }
