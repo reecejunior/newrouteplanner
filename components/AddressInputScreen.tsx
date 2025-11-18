@@ -1,8 +1,15 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { RouteStop } from '../types';
 import { UploadIcon, AddIcon, RemoveIcon, ArrowRightIcon, TrashIcon, RestoreIcon } from './Icons';
 import Spinner from './Spinner';
 import Banner from './Banner';
+
+// Add google to the window interface to avoid TypeScript errors
+declare global {
+  interface Window {
+    google: any;
+  }
+}
 
 interface AddressInputScreenProps {
   stops: RouteStop[];
@@ -29,6 +36,33 @@ const AddressInputScreen: React.FC<AddressInputScreenProps> = ({
 }) => {
   const [inputValue, setInputValue] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const placesInputRef = useRef<HTMLInputElement>(null);
+  const autocomplete = useRef<any>(null);
+
+  useEffect(() => {
+    if (window.google && placesInputRef.current && !autocomplete.current) {
+      autocomplete.current = new window.google.maps.places.Autocomplete(
+        placesInputRef.current,
+        {
+          types: ['address'],
+          componentRestrictions: { 'country': ['US', 'CA', 'GB', 'AU', 'DE', 'FR'] }, // Example countries
+          fields: ['formatted_address']
+        }
+      );
+
+      autocomplete.current.addListener('place_changed', () => {
+        const place = autocomplete.current.getPlace();
+        if (place && place.formatted_address) {
+          addStop(place.formatted_address);
+          setInputValue(''); // Clear the input field after selection
+          if(placesInputRef.current) {
+            placesInputRef.current.value = '';
+          }
+        }
+      });
+    }
+  }, []);
+
 
   const handleAddClick = () => {
     addStop(inputValue);
@@ -36,6 +70,14 @@ const AddressInputScreen: React.FC<AddressInputScreenProps> = ({
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Prevent form submission on Enter if an autocomplete suggestion is active
+    // FIX: Cast the result of querySelector to HTMLElement to access the style property.
+    const pacContainer = document.querySelector<HTMLElement>('.pac-container');
+    if (e.key === 'Enter' && pacContainer && pacContainer.style.display !== 'none') {
+      e.preventDefault();
+      return;
+    }
+    
     if (e.key === 'Enter') {
       handleAddClick();
     }
@@ -60,6 +102,7 @@ const AddressInputScreen: React.FC<AddressInputScreenProps> = ({
         
         <div className="flex flex-col sm:flex-row gap-3 mb-4">
           <input
+            ref={placesInputRef}
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}

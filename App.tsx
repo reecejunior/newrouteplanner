@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { AppView, RouteStop, RouteOption } from './types';
 import { extractAddressesFromImage, getRouteDetails } from './services/geminiService';
@@ -65,8 +64,8 @@ export default function App() {
   };
 
   const addStop = (address: string) => {
-    if (address.trim()) {
-      const newStop: RouteStop = { id: Date.now(), address };
+    if (address.trim() && !stops.some(stop => stop.address === address.trim())) {
+      const newStop: RouteStop = { id: Date.now(), address: address.trim() };
       setStops(prevStops => [...prevStops, newStop]);
     }
   };
@@ -209,64 +208,71 @@ export default function App() {
     }
   };
 
+  const renderView = () => {
+    switch (currentView) {
+      case AppView.REVIEW:
+        return (
+          <ReviewScreen
+            stops={stops}
+            removeStop={removeStop}
+            reorderStops={reorderStops}
+            calculateRoute={() => calculateRoute()}
+            goBack={() => setCurrentView(AppView.INPUT)}
+            isLoading={isLoading}
+          />
+        );
+      case AppView.RESULT:
+        return (
+          <RouteResultScreen
+            routeOptions={routeOptions}
+            selectedRouteIndex={selectedRouteIndex}
+            selectRoute={selectRoute}
+            displayedStops={getStopsForDisplay(routeOptions[selectedRouteIndex], stops)}
+            startOver={startOver}
+            addStopToRoute={addStopToRoute}
+            isLoading={isLoading}
+            saveRoute={saveRoute}
+          />
+        );
+      case AppView.INPUT:
+      default:
+        return (
+          <AddressInputScreen
+            stops={stops}
+            addStop={addStop}
+            removeStop={removeStop}
+            clearStops={clearStops}
+            handleImageUpload={handleImageUpload}
+            proceedToReview={proceedToReview}
+            isLoading={isLoading}
+            savedRouteExists={savedRouteExists}
+            loadRoute={loadRoute}
+          />
+        );
+    }
+  };
 
   return (
     <>
-      <div className={`fixed inset-0 z-50 flex items-center justify-center bg-brand-text transition-opacity duration-700 ease-out ${showSplashScreen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-        <LogoIcon className="w-48 h-48 text-brand-primary animate-glow" />
+      <div className={`fixed inset-0 z-50 flex items-center justify-center bg-brand-text transition-opacity duration-700 ease-in-out ${showSplashScreen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+          <div className="relative">
+              <LogoIcon className="w-32 h-32 text-brand-primary animate-pulse-slow" />
+              <h1 className="sr-only">AI Route Planner Pro</h1>
+          </div>
       </div>
 
-      <div className="app-background min-h-screen flex flex-col items-center">
-        <header className="sticky top-0 z-40 w-full backdrop-blur-sm">
-          <div className="max-w-5xl mx-auto flex items-center justify-start p-4 sm:p-6">
-              <LogoIcon className="w-10 h-10 text-brand-primary-dark" />
-              <h1 className="text-3xl font-heading font-bold ml-3 text-light tracking-tight">
-                AI Route Planner
-              </h1>
-          </div>
-        </header>
-        <main className="w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className={`app-background min-h-screen p-4 sm:p-6 md:p-8 flex justify-center items-start ${showSplashScreen ? 'opacity-0' : 'opacity-100 transition-opacity duration-1000 ease-in-out'}`}>
+        <main className="w-full max-w-5xl mx-auto">
           {error && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-6" role="alert">
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-6 animate-fade-in" role="alert">
               <strong className="font-bold">Error: </strong>
               <span className="block sm:inline">{error}</span>
+              <button onClick={() => setError(null)} className="absolute top-0 bottom-0 right-0 px-4 py-3">
+                <svg className="fill-current h-6 w-6 text-red-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><title>Close</title><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/></svg>
+              </button>
             </div>
           )}
-          {currentView === AppView.INPUT && (
-            <AddressInputScreen
-              stops={stops}
-              addStop={addStop}
-              removeStop={removeStop}
-              handleImageUpload={handleImageUpload}
-              proceedToReview={proceedToReview}
-              isLoading={isLoading}
-              clearStops={clearStops}
-              loadRoute={loadRoute}
-              savedRouteExists={savedRouteExists}
-            />
-          )}
-          {currentView === AppView.REVIEW && (
-            <ReviewScreen
-              stops={stops}
-              removeStop={removeStop}
-              reorderStops={reorderStops}
-              calculateRoute={() => calculateRoute()}
-              goBack={() => setCurrentView(AppView.INPUT)}
-              isLoading={isLoading}
-            />
-          )}
-          {currentView === AppView.RESULT && (
-            <RouteResultScreen
-              routeOptions={routeOptions}
-              selectedRouteIndex={selectedRouteIndex}
-              selectRoute={selectRoute}
-              displayedStops={getStopsForDisplay(routeOptions[selectedRouteIndex], stops)}
-              startOver={startOver}
-              addStopToRoute={addStopToRoute}
-              isLoading={isLoading}
-              saveRoute={saveRoute}
-            />
-          )}
+          {renderView()}
         </main>
       </div>
     </>
