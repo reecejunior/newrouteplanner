@@ -34,13 +34,3 @@ export interface RouteOption {
 }
 
 export type OptimizedRouteResponse = RouteOption[];
-
-export interface PendingUpload {
-  id: string;
-  file: File;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
-  addresses?: string[];
-  error?: string;
-  timestamp: number;
-  thumbnail?: string;
-}

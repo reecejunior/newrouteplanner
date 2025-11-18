@@ -1,13 +1,8 @@
-
-import React, { useState, useRef } from 'react';
-import { RouteStop, PendingUpload } from '../types';
-import { UploadIcon, AddIcon, RemoveIcon, ArrowRightIcon, TrashIcon, RestoreIcon, CameraIcon } from './Icons';
 import React, { useState, useRef, useEffect } from 'react';
 import { RouteStop } from '../types';
 import { UploadIcon, AddIcon, RemoveIcon, ArrowRightIcon, TrashIcon, RestoreIcon } from './Icons';
 import Spinner from './Spinner';
 import Banner from './Banner';
-import PendingUploadItem from './PendingUploadItem';
 
 // Add google to the window interface to avoid TypeScript errors
 declare global {
@@ -26,9 +21,6 @@ interface AddressInputScreenProps {
   isLoading: boolean;
   savedRouteExists: boolean;
   loadRoute: () => void;
-  pendingUploads: PendingUpload[];
-  retryUpload: (id: string) => void;
-  dismissUpload: (id: string) => void;
 }
 
 const AddressInputScreen: React.FC<AddressInputScreenProps> = ({
@@ -40,15 +32,10 @@ const AddressInputScreen: React.FC<AddressInputScreenProps> = ({
   proceedToReview,
   isLoading,
   savedRouteExists,
-  loadRoute,
-  pendingUploads,
-  retryUpload,
-  dismissUpload
+  loadRoute
 }) => {
   const [inputValue, setInputValue] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const cameraInputRef = useRef<HTMLInputElement>(null);
   const placesInputRef = useRef<HTMLInputElement>(null);
   const autocomplete = useRef<any>(null);
 
@@ -106,10 +93,6 @@ const AddressInputScreen: React.FC<AddressInputScreenProps> = ({
     fileInputRef.current?.click();
   };
 
-  const onCameraClick = () => {
-    cameraInputRef.current?.click();
-  };
-
   return (
     <>
       <Banner />
@@ -138,19 +121,9 @@ const AddressInputScreen: React.FC<AddressInputScreenProps> = ({
                 Add Stop
               </button>
               <button
-                onClick={onCameraClick}
-                className="flex-grow sm:flex-grow-0 bg-brand-primary hover:bg-brand-primary-dark text-white font-semibold py-3 px-5 rounded-lg flex items-center justify-center transition disabled:bg-gray-400 disabled:cursor-not-allowed"
-                disabled={isLoading}
-                title="Take a photo"
-              >
-                <CameraIcon className="w-5 h-5 mr-2" />
-                Camera
-              </button>
-              <button
                 onClick={onUploadClick}
                 className="flex-grow sm:flex-grow-0 bg-medium hover:bg-slate-300 text-content-100 font-semibold py-3 px-5 rounded-lg flex items-center justify-center transition disabled:bg-gray-400 disabled:cursor-not-allowed"
                 disabled={isLoading}
-                title="Upload from gallery"
               >
                 <UploadIcon className="w-5 h-5 mr-2" />
                 Upload
@@ -161,15 +134,6 @@ const AddressInputScreen: React.FC<AddressInputScreenProps> = ({
                 onChange={onFileChange}
                 className="hidden"
                 accept="image/*"
-                disabled={isLoading}
-              />
-              <input
-                type="file"
-                ref={cameraInputRef}
-                onChange={onFileChange}
-                className="hidden"
-                accept="image/*"
-                capture="environment"
                 disabled={isLoading}
               />
           </div>
@@ -188,23 +152,6 @@ const AddressInputScreen: React.FC<AddressInputScreenProps> = ({
           </div>
         )}
 
-        {/* Pending Uploads Section */}
-        {pendingUploads.length > 0 && (
-          <div className="mt-6 mb-6">
-            <h3 className="text-sm font-semibold text-content-100 mb-2">Processing Images ({pendingUploads.length})</h3>
-            <div className="space-y-2 max-h-48 overflow-y-auto">
-              {pendingUploads.map((upload) => (
-                <PendingUploadItem
-                  key={upload.id}
-                  upload={upload}
-                  onRetry={retryUpload}
-                  onDismiss={dismissUpload}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
         <div className="mt-8">
           <div className="flex justify-between items-center mb-3">
               <h3 className="text-lg font-semibold text-content-100">Your Stops ({stops.length})</h3>
@@ -216,7 +163,12 @@ const AddressInputScreen: React.FC<AddressInputScreenProps> = ({
               }
           </div>
           <div className="bg-light p-3 rounded-lg min-h-[150px] max-h-72 overflow-y-auto">
-            {stops.length === 0 ? (
+            {isLoading && stops.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center text-content-200 py-10">
+                <Spinner />
+                <span className="mt-3 font-medium">Extracting addresses...</span>
+              </div>
+            ) : stops.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center text-content-200 py-10">
                    <p className="font-medium">Your stops will appear here.</p>
               </div>

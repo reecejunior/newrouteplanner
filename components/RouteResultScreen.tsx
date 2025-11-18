@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { RouteStop, RouteOption } from '../types';
 import { formatDistance, formatDuration } from '../utils/helpers';
-import { generateRouteSummaries } from '../services/geminiService';
 import { StartOverIcon, CarIcon, ClockIcon, TotalIcon, DirectionsIcon, ChevronDownIcon, AddIcon, SaveIcon } from './Icons';
 import Spinner from './Spinner';
 
@@ -21,7 +20,6 @@ interface RouteResultScreenProps {
   addStopToRoute: (address: string) => Promise<void>;
   isLoading: boolean;
   saveRoute: () => void;
-  saveRouteAs?: (name: string) => void;
 }
 
 const DirectionsList: React.FC<{ directions: string[] }> = ({ directions }) => (
@@ -58,8 +56,7 @@ const RouteResultScreen: React.FC<RouteResultScreenProps> = ({
   startOver, 
   addStopToRoute, 
   isLoading, 
-  saveRoute,
-  saveRouteAs
+  saveRoute 
 }) => {
   const selectedRoute = routeOptions[selectedRouteIndex];
   const totalDistance = selectedRoute?.totalDistance || 0;
@@ -69,8 +66,6 @@ const RouteResultScreen: React.FC<RouteResultScreenProps> = ({
   const [openDirections, setOpenDirections] = useState<number | null>(null);
   const [newStopAddress, setNewStopAddress] = useState('');
   const [saveButtonText, setSaveButtonText] = useState('Save Route');
-  const [routeSummaries, setRouteSummaries] = useState<string[]>([]);
-  const [isGeneratingSummaries, setIsGeneratingSummaries] = useState(false);
 
   const comparisonStats = useMemo(() => {
     if (routeOptions.length <= 1) {
@@ -117,24 +112,6 @@ const RouteResultScreen: React.FC<RouteResultScreenProps> = ({
     // Reset save button text if stops/route change
     setSaveButtonText('Save Route');
   }, [displayedStops]);
-
-  useEffect(() => {
-    // Generate AI summaries when route options change
-    if (routeOptions.length > 0) {
-      setIsGeneratingSummaries(true);
-      generateRouteSummaries(routeOptions)
-        .then(summaries => {
-          setRouteSummaries(summaries);
-          setIsGeneratingSummaries(false);
-        })
-        .catch(error => {
-          console.error('Failed to generate route summaries:', error);
-          setIsGeneratingSummaries(false);
-          // Fallback to empty array - will show default info
-          setRouteSummaries([]);
-        });
-    }
-  }, [routeOptions]);
 
   useEffect(() => {
     if (!mapRef.current || !window.google || displayedStops.length === 0 || !displayedStops[0].lat) {
@@ -238,24 +215,6 @@ const RouteResultScreen: React.FC<RouteResultScreenProps> = ({
       {routeOptions.length > 1 && (
         <div className="mb-8">
             <h3 className="text-lg font-bold text-content-100 mb-3">Choose Your Route</h3>
-            {isGeneratingSummaries && (
-              <div className="mb-4 flex items-center gap-2 text-content-200 text-sm">
-                <Spinner />
-                <span>Generating quick summaries...</span>
-              </div>
-            )}
-            {routeSummaries.length > 0 && !isGeneratingSummaries && (
-              <div className="mb-4 p-3 bg-brand-primary/5 border border-brand-primary/20 rounded-lg">
-                <p className="text-xs font-semibold text-content-200 mb-2">Quick Decision Guide:</p>
-                <ul className="space-y-1">
-                  {routeSummaries.map((summary, idx) => (
-                    <li key={idx} className="text-sm font-medium text-content-100">
-                      • {summary}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 {routeOptions.map((option, index) => {
                     const badges: React.ReactNode[] = [];
@@ -297,11 +256,6 @@ const RouteResultScreen: React.FC<RouteResultScreenProps> = ({
                                         {badges}
                                     </div>
                                 </div>
-                                {routeSummaries[index] && (
-                                  <p className="text-sm font-semibold text-brand-primary mt-1 mb-1">
-                                    {routeSummaries[index]}
-                                  </p>
-                                )}
                                 <p className="text-sm text-content-200 mt-2">{option.description}</p>
                             </div>
                             <div className="flex items-center gap-4 mt-4 pt-3 border-t border-slate-200 text-sm font-semibold text-content-100">

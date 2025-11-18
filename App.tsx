@@ -1,12 +1,138 @@
-import React, { useState, useEffect } from 'react';
-import { AppView, RouteStop, RouteOption, PendingUpload } from './types';
-import { getRouteDetails } from './services/geminiService';
-import { uploadQueue } from './utils/uploadQueue';
-import { saveRouteToHistory, getRouteHistory, loadRouteFromHistory, SavedRoute } from './utils/routeHistory';
+import React, { useState, useEffect, useRef } from 'react';
+import { AppView, RouteStop, RouteOption } from './types';
+import { extractAddressesFromImage, getRouteDetails } from './services/geminiService';
 import AddressInputScreen from './components/AddressInputScreen';
 import ReviewScreen from './components/ReviewScreen';
 import RouteResultScreen from './components/RouteResultScreen';
-import { LogoIcon } from './components/Icons';
+import { LogoIcon, AddIcon, RemoveIcon } from './components/Icons';
+
+// Add google to the window interface to avoid TypeScript errors
+declare global {
+  interface Window {
+    google: any;
+  }
+}
+
+// Sub-component for an input with Google Places Autocomplete
+const AutocompleteInput: React.FC<{
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+}> = ({ value, onChange, placeholder }) => {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const autocomplete = useRef<any>(null);
+
+  useEffect(() => {
+    if (window.google && inputRef.current && !autocomplete.current) {
+      autocomplete.current = new window.google.maps.places.Autocomplete(
+        inputRef.current,
+        {
+          types: ['address'],
+          componentRestrictions: { 'country': ['US', 'CA', 'GB', 'AU', 'DE', 'FR'] },
+          fields: ['formatted_address']
+        }
+      );
+
+      autocomplete.current.addListener('place_changed', () => {
+        const place = autocomplete.current.getPlace();
+        if (place && place.formatted_address) {
+          onChange(place.formatted_address);
+        }
+      });
+    }
+  }, [onChange]);
+  
+  // To handle manual edits that don't use autocomplete
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onChange(e.target.value);
+  };
+
+  return (
+    <input
+      ref={inputRef}
+      type="text"
+      value={value}
+      onChange={handleInputChange}
+      placeholder={placeholder}
+      className="flex-grow w-full bg-light border border-medium text-content-100 rounded-lg px-4 py-3 focus:ring-2 focus:ring-brand-primary focus:border-brand-primary focus:outline-none transition"
+    />
+  );
+};
+
+
+// Modal component for reviewing OCR results
+const OcrReviewModal: React.FC<{
+  results: string[];
+  onConfirm: (addresses: string[]) => void;
+  onCancel: () => void;
+}> = ({ results, onConfirm, onCancel }) => {
+  const [editedAddresses, setEditedAddresses] = useState<string[]>(results);
+
+  const handleAddressChange = (index: number, newValue: string) => {
+    const newAddresses = [...editedAddresses];
+    newAddresses[index] = newValue;
+    setEditedAddresses(newAddresses);
+  };
+
+  const removeAddress = (index: number) => {
+    setEditedAddresses(editedAddresses.filter((_, i) => i !== index));
+  };
+
+  const handleConfirm = () => {
+    onConfirm(editedAddresses.filter(addr => addr.trim() !== ''));
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in-sm">
+      <div className="bg-white w-full max-w-2xl rounded-2xl shadow-lg p-6 sm:p-8 animate-slide-in-up">
+        <h2 className="text-2xl font-bold font-heading mb-2 text-content-100">Review Extracted Addresses</h2>
+        <p className="text-content-200 mb-6">Correct any errors and remove incorrect entries before adding them to your route.</p>
+        
+        <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-2">
+          {editedAddresses.map((address, index) => (
+            <div key={index} className="flex items-center gap-3">
+              <AutocompleteInput 
+                value={address}
+                onChange={newValue => handleAddressChange(index, newValue)}
+                placeholder="Enter or correct address"
+              />
+              <button
+                onClick={() => removeAddress(index)}
+                className="text-dark hover:text-red-500 p-2 rounded-full transition flex-shrink-0"
+                aria-label="Remove address"
+              >
+                <RemoveIcon className="w-6 h-6" />
+              </button>
+            </div>
+          ))}
+        </div>
+        
+        {editedAddresses.length === 0 && (
+          <div className="text-center py-8 text-content-200">
+            <p>No addresses to review.</p>
+          </div>
+        )}
+
+        <div className="mt-8 flex flex-col-reverse sm:flex-row justify-end gap-3">
+          <button
+            onClick={onCancel}
+            className="w-full sm:w-auto text-content-200 hover:bg-medium font-bold py-3 px-6 rounded-lg flex items-center justify-center transition"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleConfirm}
+            className="w-full sm:w-auto bg-gradient-primary text-brand-text font-bold py-3 px-8 rounded-lg flex items-center justify-center transition-transform hover:scale-105"
+          >
+            <AddIcon className="w-5 h-5 mr-2" />
+            Add Stops
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 
 const STORAGE_KEY = 'aiRoutePlannerPro_savedRoute';
 
@@ -19,7 +145,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [savedRouteExists, setSavedRouteExists] = useState(false);
   const [showSplashScreen, setShowSplashScreen] = useState(true);
-  const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
+  const [ocrResults, setOcrResults] = useState<string[] | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -41,59 +167,45 @@ export default function App() {
     }
   }, []);
 
-  const handleImageUpload = (file: File) => {
-    // Immediately add to queue - non-blocking
-    const uploadId = uploadQueue.addUpload(file, (upload: PendingUpload) => {
-      // Update pending uploads state
-      setPendingUploads(prev => {
-        const existing = prev.find(u => u.id === upload.id);
-        if (existing) {
-          return prev.map(u => u.id === upload.id ? upload : u);
+  const handleImageUpload = async (file: File) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = async () => {
+        const base64Image = (reader.result as string).split(',')[1];
+        const addresses = await extractAddressesFromImage(base64Image, file.type);
+        if (addresses.length > 0) {
+            setOcrResults(addresses);
         } else {
-          return [...prev, upload];
+            setError("No addresses could be found in the image.");
         }
-      });
-
-      // When upload completes, add addresses to stops
-      if (upload.status === 'completed' && upload.addresses && upload.addresses.length > 0) {
-        const newStops: RouteStop[] = upload.addresses.map((address, index) => ({
-          id: Date.now() + index + Math.random(),
-          address,
-        }));
-        setStops(prevStops => [...prevStops, ...newStops]);
-        
-        // Auto-remove completed upload after 3 seconds
-        setTimeout(() => {
-          setPendingUploads(prev => prev.filter(u => u.id !== upload.id));
-          uploadQueue.removeUpload(upload.id);
-        }, 3000);
-      }
-
-      // Show error notification for failed uploads
-      if (upload.status === 'failed') {
-        setError(`Failed to extract addresses: ${upload.error || 'Unknown error'}`);
-        setTimeout(() => setError(null), 5000);
-      }
-    });
-
-    // Update state to show pending upload immediately
-    const newUpload: PendingUpload = {
-      id: uploadId,
-      file,
-      status: 'pending',
-      timestamp: Date.now(),
-      thumbnail: URL.createObjectURL(file),
-    };
-    setPendingUploads(prev => [...prev, newUpload]);
+        setIsLoading(false);
+      };
+      reader.onerror = () => {
+        setIsLoading(false);
+        throw new Error('Failed to read file.');
+      };
+    } catch (err) {
+      setError('Could not extract addresses from image. Please try again.');
+      setIsLoading(false);
+    }
   };
 
-  const retryUpload = (id: string) => {
-    uploadQueue.retryUpload(id);
+  const handleConfirmOcrStops = (confirmedAddresses: string[]) => {
+    const newStops: RouteStop[] = confirmedAddresses.map((address, index) => ({
+      id: Date.now() + index,
+      address,
+    }));
+    // Filter out duplicates that might already be in the list
+    const uniqueNewStops = newStops.filter(newStop => !stops.some(existingStop => existingStop.address === newStop.address));
+    setStops(prevStops => [...prevStops, ...uniqueNewStops]);
+    setOcrResults(null);
   };
-
-  const dismissUpload = (id: string) => {
-    setPendingUploads(prev => prev.filter(u => u.id !== id));
-    uploadQueue.removeUpload(id);
+  
+  const handleCancelOcr = () => {
+    setOcrResults(null);
   };
 
   const addStop = (address: string) => {
@@ -191,32 +303,11 @@ export default function App() {
   const saveRoute = () => {
     if (!routeOptions[selectedRouteIndex]) return;
     const stopsToSave = getStopsForDisplay(routeOptions[selectedRouteIndex], stops);
-    const routeOption = routeOptions[selectedRouteIndex];
-    
     try {
-      // Save to legacy storage for backward compatibility
       localStorage.setItem(STORAGE_KEY, JSON.stringify(stopsToSave));
       setSavedRouteExists(true);
-      
-      // Also save to history with auto-generated name
-      const routeName = `Route ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
-      saveRouteToHistory(routeName, stopsToSave, routeOption);
     } catch (e) {
       console.error("Could not save route to local storage", e);
-      setError("Failed to save the route.");
-    }
-  };
-
-  const saveRouteAs = (name: string) => {
-    if (!routeOptions[selectedRouteIndex]) return;
-    const stopsToSave = getStopsForDisplay(routeOptions[selectedRouteIndex], stops);
-    const routeOption = routeOptions[selectedRouteIndex];
-    
-    try {
-      saveRouteToHistory(name, stopsToSave, routeOption);
-      setError(null);
-    } catch (e) {
-      console.error("Could not save route to history", e);
       setError("Failed to save the route.");
     }
   };
@@ -315,6 +406,14 @@ export default function App() {
           </div>
       </div>
 
+      {ocrResults && (
+        <OcrReviewModal 
+          results={ocrResults}
+          onConfirm={handleConfirmOcrStops}
+          onCancel={handleCancelOcr}
+        />
+      )}
+
       <div className={`app-background min-h-screen p-4 sm:p-6 md:p-8 flex justify-center items-start ${showSplashScreen ? 'opacity-0' : 'opacity-100 transition-opacity duration-1000 ease-in-out'}`}>
         <main className="w-full max-w-5xl mx-auto">
           {error && (
@@ -325,48 +424,8 @@ export default function App() {
                 <svg className="fill-current h-6 w-6 text-red-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><title>Close</title><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/></svg>
               </button>
             </div>
-          )
-          {currentView === AppView.INPUT && (
-            <AddressInputScreen
-              stops={stops}
-              addStop={addStop}
-              removeStop={removeStop}
-              handleImageUpload={handleImageUpload}
-              proceedToReview={proceedToReview}
-              isLoading={isLoading}
-              clearStops={clearStops}
-              loadRoute={loadRoute}
-              savedRouteExists={savedRouteExists}
-              pendingUploads={pendingUploads}
-              retryUpload={retryUpload}
-              dismissUpload={dismissUpload}
-            />
-          )}
-          {currentView === AppView.REVIEW && (
-            <ReviewScreen
-              stops={stops}
-              removeStop={removeStop}
-              reorderStops={reorderStops}
-              calculateRoute={() => calculateRoute()}
-              goBack={() => setCurrentView(AppView.INPUT)}
-              isLoading={isLoading}
-            />
-          )}
-          {currentView === AppView.RESULT && (
-            <RouteResultScreen
-              routeOptions={routeOptions}
-              selectedRouteIndex={selectedRouteIndex}
-              selectRoute={selectRoute}
-              displayedStops={getStopsForDisplay(routeOptions[selectedRouteIndex], stops)}
-              startOver={startOver}
-              addStopToRoute={addStopToRoute}
-              isLoading={isLoading}
-              saveRoute={saveRoute}
-              saveRouteAs={saveRouteAs}
-            />
           )}
           {renderView()}
-           main
         </main>
       </div>
     </>
