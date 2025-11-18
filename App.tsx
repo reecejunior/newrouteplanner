@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { AppView, RouteStop, RouteOption } from './types';
-import { extractAddressesFromImage, getRouteDetails } from './services/geminiService';
+import { AppView, RouteStop, RouteOption, PendingUpload } from './types';
+import { getRouteDetails } from './services/geminiService';
+import { uploadQueue } from './utils/uploadQueue';
+import { saveRouteToHistory, getRouteHistory, loadRouteFromHistory, SavedRoute } from './utils/routeHistory';
 import AddressInputScreen from './components/AddressInputScreen';
 import ReviewScreen from './components/ReviewScreen';
 import RouteResultScreen from './components/RouteResultScreen';
@@ -17,6 +19,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [savedRouteExists, setSavedRouteExists] = useState(false);
   const [showSplashScreen, setShowSplashScreen] = useState(true);
+  const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -38,29 +41,59 @@ export default function App() {
     }
   }, []);
 
-  const handleImageUpload = async (file: File) => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = async () => {
-        const base64Image = (reader.result as string).split(',')[1];
-        const addresses = await extractAddressesFromImage(base64Image, file.type);
-        const newStops: RouteStop[] = addresses.map((address, index) => ({
-          id: Date.now() + index,
+  const handleImageUpload = (file: File) => {
+    // Immediately add to queue - non-blocking
+    const uploadId = uploadQueue.addUpload(file, (upload: PendingUpload) => {
+      // Update pending uploads state
+      setPendingUploads(prev => {
+        const existing = prev.find(u => u.id === upload.id);
+        if (existing) {
+          return prev.map(u => u.id === upload.id ? upload : u);
+        } else {
+          return [...prev, upload];
+        }
+      });
+
+      // When upload completes, add addresses to stops
+      if (upload.status === 'completed' && upload.addresses && upload.addresses.length > 0) {
+        const newStops: RouteStop[] = upload.addresses.map((address, index) => ({
+          id: Date.now() + index + Math.random(),
           address,
         }));
         setStops(prevStops => [...prevStops, ...newStops]);
-        setIsLoading(false);
-      };
-      reader.onerror = () => {
-        throw new Error('Failed to read file.');
-      };
-    } catch (err) {
-      setError('Could not extract addresses from image. Please try again.');
-      setIsLoading(false);
-    }
+        
+        // Auto-remove completed upload after 3 seconds
+        setTimeout(() => {
+          setPendingUploads(prev => prev.filter(u => u.id !== upload.id));
+          uploadQueue.removeUpload(upload.id);
+        }, 3000);
+      }
+
+      // Show error notification for failed uploads
+      if (upload.status === 'failed') {
+        setError(`Failed to extract addresses: ${upload.error || 'Unknown error'}`);
+        setTimeout(() => setError(null), 5000);
+      }
+    });
+
+    // Update state to show pending upload immediately
+    const newUpload: PendingUpload = {
+      id: uploadId,
+      file,
+      status: 'pending',
+      timestamp: Date.now(),
+      thumbnail: URL.createObjectURL(file),
+    };
+    setPendingUploads(prev => [...prev, newUpload]);
+  };
+
+  const retryUpload = (id: string) => {
+    uploadQueue.retryUpload(id);
+  };
+
+  const dismissUpload = (id: string) => {
+    setPendingUploads(prev => prev.filter(u => u.id !== id));
+    uploadQueue.removeUpload(id);
   };
 
   const addStop = (address: string) => {
@@ -158,11 +191,32 @@ export default function App() {
   const saveRoute = () => {
     if (!routeOptions[selectedRouteIndex]) return;
     const stopsToSave = getStopsForDisplay(routeOptions[selectedRouteIndex], stops);
+    const routeOption = routeOptions[selectedRouteIndex];
+    
     try {
+      // Save to legacy storage for backward compatibility
       localStorage.setItem(STORAGE_KEY, JSON.stringify(stopsToSave));
       setSavedRouteExists(true);
+      
+      // Also save to history with auto-generated name
+      const routeName = `Route ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
+      saveRouteToHistory(routeName, stopsToSave, routeOption);
     } catch (e) {
       console.error("Could not save route to local storage", e);
+      setError("Failed to save the route.");
+    }
+  };
+
+  const saveRouteAs = (name: string) => {
+    if (!routeOptions[selectedRouteIndex]) return;
+    const stopsToSave = getStopsForDisplay(routeOptions[selectedRouteIndex], stops);
+    const routeOption = routeOptions[selectedRouteIndex];
+    
+    try {
+      saveRouteToHistory(name, stopsToSave, routeOption);
+      setError(null);
+    } catch (e) {
+      console.error("Could not save route to history", e);
       setError("Failed to save the route.");
     }
   };
@@ -271,8 +325,48 @@ export default function App() {
                 <svg className="fill-current h-6 w-6 text-red-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><title>Close</title><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/></svg>
               </button>
             </div>
+          )
+          {currentView === AppView.INPUT && (
+            <AddressInputScreen
+              stops={stops}
+              addStop={addStop}
+              removeStop={removeStop}
+              handleImageUpload={handleImageUpload}
+              proceedToReview={proceedToReview}
+              isLoading={isLoading}
+              clearStops={clearStops}
+              loadRoute={loadRoute}
+              savedRouteExists={savedRouteExists}
+              pendingUploads={pendingUploads}
+              retryUpload={retryUpload}
+              dismissUpload={dismissUpload}
+            />
+          )}
+          {currentView === AppView.REVIEW && (
+            <ReviewScreen
+              stops={stops}
+              removeStop={removeStop}
+              reorderStops={reorderStops}
+              calculateRoute={() => calculateRoute()}
+              goBack={() => setCurrentView(AppView.INPUT)}
+              isLoading={isLoading}
+            />
+          )}
+          {currentView === AppView.RESULT && (
+            <RouteResultScreen
+              routeOptions={routeOptions}
+              selectedRouteIndex={selectedRouteIndex}
+              selectRoute={selectRoute}
+              displayedStops={getStopsForDisplay(routeOptions[selectedRouteIndex], stops)}
+              startOver={startOver}
+              addStopToRoute={addStopToRoute}
+              isLoading={isLoading}
+              saveRoute={saveRoute}
+              saveRouteAs={saveRouteAs}
+            />
           )}
           {renderView()}
+           main
         </main>
       </div>
     </>
